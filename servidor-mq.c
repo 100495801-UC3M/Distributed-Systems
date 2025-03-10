@@ -11,12 +11,10 @@
 #define SERVER_QUEUE_NAME   "/mq_server"
 #define QUEUE_PERMISSIONS   0660
 #define MAX_MESSAGES        10
-#define MAX_MSG_SIZE        1024
 
 #define MAX_VALUE1_LEN 256
 #define MAX_V2 32
 
-// Definición de los códigos de operación para las peticiones.
 typedef enum {
     OP_DESTROY = 0,
     OP_SET,
@@ -26,7 +24,7 @@ typedef enum {
     OP_EXIST
 } op_code_t;
 
-// Estructura del mensaje de petición.
+// Estructura de mensaje de petición.
 typedef struct {
     op_code_t op;
     int key;
@@ -34,33 +32,27 @@ typedef struct {
     int N_value2;
     double V_value2[MAX_V2];
     struct Coord value3;
-    char client_queue_name[64];  // Nombre de la cola de respuesta del cliente.
+    char client_queue_name[64];
 } request_msg_t;
 
-// Estructura del mensaje de respuesta.
+// Estructura de mensaje de respuesta.
 typedef struct {
-    int result;  // Resultado de la operación (0, -1 o 1/0 en el caso de exist).
-    char value1[MAX_VALUE1_LEN];  // En get se devuelve también la cadena.
-    int N_value2;                 // En get se devuelve la dimensión del vector.
-    double V_value2[MAX_V2];      // En get se devuelven los componentes del vector.
-    struct Coord value3;          // En get se devuelve la estructura Coord.
+    int result;
+    char value1[MAX_VALUE1_LEN];
+    int N_value2;
+    double V_value2[MAX_V2];
+    struct Coord value3;
 } response_msg_t;
 
-/**
- * @brief Función que procesa una petición recibida por la cola de mensajes.
- * Se crea un hilo para cada petición, el cual:
- *  - Llama a la función correspondiente de la API de claves.
- *  - Abre la cola del cliente (cuyo nombre viene en la petición) para enviar la respuesta.
- */
 void* handle_request(void* arg) {
-    // Copiar la petición y liberar la memoria asignada.
     request_msg_t req = *((request_msg_t*)arg);
     free(arg);
 
+    printf("[Servidor] Recibida petición: op=%d, key=%d, client_queue=%s\n", req.op, req.key, req.client_queue_name);
+    
     response_msg_t resp;
     memset(&resp, 0, sizeof(resp));
 
-    // Procesar la petición según el código de operación.
     switch(req.op) {
         case OP_DESTROY:
             resp.result = destroy();
@@ -84,8 +76,9 @@ void* handle_request(void* arg) {
             resp.result = -1;
             break;
     }
-
-    // Abrir la cola de mensajes del cliente para enviar la respuesta.
+    
+    printf("[Servidor] Enviando respuesta: result=%d\n", resp.result);
+    
     mqd_t client_q = mq_open(req.client_queue_name, O_WRONLY);
     if (client_q == (mqd_t)-1) {
         perror("mq_open (cliente)");
@@ -102,13 +95,11 @@ int main(void) {
     mqd_t server_q;
     struct mq_attr attr;
 
-    // Configuración de la cola de mensajes del servidor.
     attr.mq_flags = 0;
     attr.mq_maxmsg = MAX_MESSAGES;
     attr.mq_msgsize = sizeof(request_msg_t);
     attr.mq_curmsgs = 0;
 
-    // Eliminar cualquier cola previa con el mismo nombre.
     mq_unlink(SERVER_QUEUE_NAME);
     server_q = mq_open(SERVER_QUEUE_NAME, O_RDONLY | O_CREAT, QUEUE_PERMISSIONS, &attr);
     if (server_q == (mqd_t)-1) {
@@ -118,7 +109,6 @@ int main(void) {
 
     printf("Servidor de colas de mensajes iniciado. Esperando peticiones...\n");
 
-    // Bucle principal para recibir y procesar peticiones.
     while (1) {
         request_msg_t *req = malloc(sizeof(request_msg_t));
         if (!req) {
@@ -128,7 +118,6 @@ int main(void) {
         ssize_t bytes_read = mq_receive(server_q, (char *)req, sizeof(request_msg_t), NULL);
         if (bytes_read >= 0) {
             pthread_t thread;
-            // Crear un hilo para procesar la petición de forma concurrente.
             if (pthread_create(&thread, NULL, handle_request, req) != 0) {
                 perror("pthread_create");
                 free(req);

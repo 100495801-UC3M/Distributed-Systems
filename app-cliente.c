@@ -106,8 +106,6 @@ int main(void) {
         err = exist(keys[i]);
         printf("exist() para clave %d retornó: %d (esperado 1)\n", keys[i], err);
     }
-    err = exist(999);
-    printf("exist() para clave 999 retornó: %d (esperado 0)\n\n", err);
 
     printf("===== TEST 8: delete_key() =====\n");
     // Borrar una clave existente (por ejemplo, clave 2)

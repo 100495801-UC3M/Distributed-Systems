@@ -5,22 +5,22 @@ LDFLAGS = -shared
 LIBS = -lrt -lpthread
 
 # Archivos fuente y objetos
-PROXY_SRC = proxy-mq.c
-PROXY_OBJ = proxy-mq.o
+PROXY_SRC = proxy-sock.c
+PROXY_OBJ = proxy-sock.o
 LIBRARY = libclaves.so
 
 CLIENT_SRC = app-cliente.c
 CLIENT_BIN = app-cliente
 
-SERVER_SRC = servidor-mq.c
+SERVER_SRC = servidor-sock.c
 SERVER_EXTRA = claves.c
-SERVER_BIN = servidor-mq
+SERVER_BIN = servidor-sock
 
 # Compilar la biblioteca compartida libclaves.so (usada por el cliente)
 $(LIBRARY): $(PROXY_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-# Compilar proxy-mq.c a objeto
+# Compilar proxy-sock.c a objeto
 $(PROXY_OBJ): $(PROXY_SRC)
 	$(CC) $(CFLAGS) -c $< -o $@
 

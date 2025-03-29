@@ -51,8 +51,10 @@ typedef struct {
 void request_to_string(request_msg_t *req, char *buffer, size_t size) {
     char doubles[2048] = "";
     for (int i = 0; i < req->N_value2; i++) {
+        uint32_t high = (uint32_t)(req->V_value2[i]) >> 16;
+        uint32_t low = (uint32_t)(req->V_value2[i]) & 0xFFFF;
         char temp[64];
-        sprintf(temp, "%.17lf%s", req->V_value2[i], (i < req->N_value2 - 1) ? "," : "");
+        sprintf(temp, "%u,%u%s", high, low, (i < req->N_value2 - 1) ? "," : "");
         strcat(doubles, temp);
     }
     sprintf(buffer, "%d|%d|%s|%d|%s|%d,%d|%s", 
@@ -84,7 +86,11 @@ void string_to_request(char *buffer, request_msg_t *req) {
         int count = 0;
         char *num = strtok(token, ",");
         while (num && count < req->N_value2 && count < MAX_V2) {
-            req->V_value2[count++] = atof(num);
+            uint32_t high = atoi(num);
+            num = strtok(NULL, ",");
+            if (!num) break;
+            uint32_t low = atoi(num);
+            req->V_value2[count++] = ((double)high << 16) | low;
             num = strtok(NULL, ",");
         }
     }
@@ -104,8 +110,10 @@ void string_to_request(char *buffer, request_msg_t *req) {
 void response_to_string(response_msg_t *resp, char *buffer, size_t size) {
     char doubles[2048] = "";
     for (int i = 0; i < resp->N_value2; i++) {
+        uint32_t high = (uint32_t)(resp->V_value2[i]) >> 16;
+        uint32_t low = (uint32_t)(resp->V_value2[i]) & 0xFFFF;
         char temp[64];
-        sprintf(temp, "%.17lf%s", resp->V_value2[i], (i < resp->N_value2 - 1)? "," : "");
+        sprintf(temp, "%u,%u%s", high, low, (i < resp->N_value2 - 1)? "," : "");
         strcat(doubles, temp);
     }
     sprintf(buffer, "%d|%s|%d|%s|%d,%d", 

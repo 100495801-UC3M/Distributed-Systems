@@ -1,17 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <mqueue.h>
 #include <errno.h>
 #include <pthread.h>
-#include <fcntl.h>    // Para O_* 
-#include <sys/stat.h> // Para modos
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "claves.h"
 
-#define SERVER_QUEUE_NAME   "/mq_server"
-#define QUEUE_PERMISSIONS   0660
-#define MAX_MESSAGES        10
-
+#define SERVER_PORT 8080           // Valor por defecto; se puede cambiar por parámetro
+#define BACKLOG 10
+#define MSG_BUFFER_SIZE 2048
 #define MAX_VALUE1_LEN 256
 #define MAX_V2 32
 
@@ -32,7 +33,7 @@ typedef struct {
     int N_value2;
     double V_value2[MAX_V2];
     struct Coord value3;
-    char client_queue_name[64];
+    char client_queue_name[64];  // No se usa en sockets; se puede dejar vacío o ignorar
 } request_msg_t;
 
 // Estructura de mensaje de respuesta.
@@ -44,15 +45,108 @@ typedef struct {
     struct Coord value3;
 } response_msg_t;
 
-void* handle_request(void* arg) {
-    request_msg_t req = *((request_msg_t*)arg);
-    free(arg);
+///////////////// FUNCIONES DE CONVERSIÓN //////////////////
+// Estas funciones convierten entre struct y cadena (separados por '|')
+// Se asume que tanto string_to_request como response_to_string están correctamente implementadas.
+void request_to_string(request_msg_t *req, char *buffer, size_t size) {
+    char doubles[2048] = "";
+    for (int i = 0; i < req->N_value2; i++) {
+        char temp[64];
+        sprintf(temp, "%.17lf%s", req->V_value2[i], (i < req->N_value2 - 1) ? "," : "");
+        strcat(doubles, temp);
+    }
+    sprintf(buffer, "%d|%d|%s|%d|%s|%d,%d|%s", 
+        req->op, req->key, req->value1, req->N_value2, doubles, req->value3.x, req->value3.y, ""); 
+    // El último campo no es usado en sockets
+}
 
-    printf("[Servidor] Recibida petición: op=%d, key=%d, client_queue=%s\n", req.op, req.key, req.client_queue_name);
+void string_to_request(char *buffer, request_msg_t *req) {
+    char *token = strtok(buffer, "|");
+    if (!token) return;
+    req->op = atoi(token);
+
+    token = strtok(NULL, "|");
+    if (!token) return;
+    req->key = atoi(token);
+
+    token = strtok(NULL, "|");
+    if (!token) return;
+    strncpy(req->value1, token, MAX_VALUE1_LEN-1);
+    req->value1[MAX_VALUE1_LEN-1] = '\0';
+
+    token = strtok(NULL, "|");
+    if (!token) return;
+    req->N_value2 = atoi(token);
+
+    token = strtok(NULL, "|");
+    if (!token) return;
+    {
+        int count = 0;
+        char *num = strtok(token, ",");
+        while (num && count < req->N_value2 && count < MAX_V2) {
+            req->V_value2[count++] = atof(num);
+            num = strtok(NULL, ",");
+        }
+    }
+
+    token = strtok(NULL, "|");
+    if (!token) return;
+    {
+        char *xStr = strtok(token, ",");
+        char *yStr = strtok(NULL, ",");
+        if (xStr && yStr) {
+            req->value3.x = atoi(xStr);
+            req->value3.y = atoi(yStr);
+        }
+    }
+}
+
+void response_to_string(response_msg_t *resp, char *buffer, size_t size) {
+    char doubles[2048] = "";
+    for (int i = 0; i < resp->N_value2; i++) {
+        char temp[64];
+        sprintf(temp, "%.17lf%s", resp->V_value2[i], (i < resp->N_value2 - 1)? "," : "");
+        strcat(doubles, temp);
+    }
+    sprintf(buffer, "%d|%s|%d|%s|%d,%d", 
+        resp->result, resp->value1, resp->N_value2, doubles, resp->value3.x, resp->value3.y);
+}
+
+///////////////// FIN FUNCIONES DE CONVERSIÓN //////////////////
+
+static pthread_mutex_t server_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void* handle_request(void* arg) {
+    int client_fd = *(int*)arg;
+    free(arg);
+    char buffer[MSG_BUFFER_SIZE] = "";
+    ssize_t total = 0;
+    
+    // Bloqueo global para evitar lecturas/parseos concurrentes
+    pthread_mutex_lock(&server_mutex);
+    while(1) {
+        ssize_t n = recv(client_fd, buffer + total, sizeof(buffer) - 1 - total, 0);
+        if(n <= 0) {
+            perror("recv");
+            close(client_fd);
+            pthread_mutex_unlock(&server_mutex);
+            pthread_exit(NULL);
+        }
+        total += n;
+        buffer[total] = '\0';
+        // Aquí podrías detectar un fin lógico (por ejemplo, si includes un delimitador)
+        // o simplemente romper si no esperas más datos.
+        // Para ejemplo:
+        break; 
+    }
+    
+    request_msg_t req;
+    string_to_request(buffer, &req);
+    printf("[Servidor] Recibida petición: op=%d, key=%d\n", req.op, req.key);
     
     response_msg_t resp;
     memset(&resp, 0, sizeof(resp));
-
+    
     switch(req.op) {
         case OP_DESTROY:
             resp.result = destroy();
@@ -78,59 +172,71 @@ void* handle_request(void* arg) {
     }
     
     printf("[Servidor] Enviando respuesta: result=%d\n", resp.result);
-    
-    mqd_t client_q = mq_open(req.client_queue_name, O_WRONLY);
-    if (client_q == (mqd_t)-1) {
-        perror("mq_open (cliente)");
-        pthread_exit(NULL);
+    memset(buffer, 0, sizeof(buffer));
+    response_to_string(&resp, buffer, sizeof(buffer));
+    if(send(client_fd, buffer, strlen(buffer), 0) != (ssize_t)strlen(buffer)) {
+        perror("send");
     }
-    if (mq_send(client_q, (char *)&resp, sizeof(resp), 0) == -1) {
-        perror("mq_send (cliente)");
-    }
-    mq_close(client_q);
+    close(client_fd);
+    pthread_mutex_unlock(&server_mutex);
     pthread_exit(NULL);
 }
 
-int main(void) {
-    mqd_t server_q;
-    struct mq_attr attr;
-
-    attr.mq_flags = 0;
-    attr.mq_maxmsg = MAX_MESSAGES;
-    attr.mq_msgsize = sizeof(request_msg_t);
-    attr.mq_curmsgs = 0;
-
-    mq_unlink(SERVER_QUEUE_NAME);
-    server_q = mq_open(SERVER_QUEUE_NAME, O_RDONLY | O_CREAT, QUEUE_PERMISSIONS, &attr);
-    if (server_q == (mqd_t)-1) {
-        perror("mq_open (servidor)");
+int main(int argc, char *argv[]) {
+    int server_fd;
+    struct sockaddr_in server_addr;
+    int port = SERVER_PORT;
+    if(argc >= 2) {
+        port = atoi(argv[1]);
+    }
+    
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(server_fd == -1) {
+        perror("socket");
         exit(EXIT_FAILURE);
     }
-
-    printf("Servidor de colas de mensajes iniciado. Esperando peticiones...\n");
-
-    while (1) {
-        request_msg_t *req = malloc(sizeof(request_msg_t));
-        if (!req) {
+    
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    // Escuchar en todas las interfaces
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(port);
+    
+    if(bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        perror("bind");
+        exit(EXIT_FAILURE);
+    }
+    if(listen(server_fd, BACKLOG) == -1) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+    
+    printf("Servidor de sockets iniciado. Escuchando en el puerto %d...\n", port);
+    
+    while(1) {
+        int *client_fd = malloc(sizeof(int));
+        if(!client_fd) {
             perror("malloc");
             continue;
         }
-        ssize_t bytes_read = mq_receive(server_q, (char *)req, sizeof(request_msg_t), NULL);
-        if (bytes_read >= 0) {
-            pthread_t thread;
-            if (pthread_create(&thread, NULL, handle_request, req) != 0) {
-                perror("pthread_create");
-                free(req);
-            } else {
-                pthread_detach(thread);
-            }
+        struct sockaddr_in client_addr;
+        socklen_t addr_len = sizeof(client_addr);
+        *client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len);
+        if(*client_fd == -1) {
+            perror("accept");
+            free(client_fd);
+            continue;
+        }
+        pthread_t thread;
+        if(pthread_create(&thread, NULL, handle_request, client_fd) != 0) {
+            perror("pthread_create");
+            close(*client_fd);
+            free(client_fd);
         } else {
-            perror("mq_receive");
-            free(req);
+            pthread_detach(thread);
         }
     }
-
-    mq_close(server_q);
-    mq_unlink(SERVER_QUEUE_NAME);
+    
+    close(server_fd);
     return 0;
 }

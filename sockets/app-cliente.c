@@ -20,6 +20,9 @@ void print_tuple(int key, const char *value1, int N_value2, double *V_value2, st
 }
 
 int main(void) {
+    // Llamada para que el proxy lea la variable SERVER_PORT
+    init_proxy(NULL, 0);
+
     int err;
     char value1[MAX_STR_LEN];
     int N_value2;

@@ -32,13 +32,18 @@ $(CLIENT_BIN): $(CLIENT_SRC) $(LIBRARY)
 $(SERVER_BIN): $(SERVER_SRC) $(SERVER_EXTRA)
 	$(CC) -o $@ $(SERVER_SRC) $(SERVER_EXTRA) $(LIBS)
 
-# Ejecutar el servidor
-run-server: $(SERVER_BIN)
-	./$(SERVER_BIN)
-
-# Ejecutar el cliente (asegúrate de que LD_LIBRARY_PATH incluya el directorio actual)
-run-client: $(CLIENT_BIN)
-	LD_LIBRARY_PATH=. ./$(CLIENT_BIN)
+# Ejecutar el servidor y el cliente con el mismo puerto el comando es: make run-server PORT=<puerto>
+run-server: $(SERVER_BIN) $(CLIENT_BIN)
+	@ if [ -z "$(PORT)" ]; then \
+		echo "Uso: make run-server PORT=<puerto>"; \
+		exit 1; \
+	  fi; \
+	echo "Iniciando servidor en el puerto $$PORT..."; \
+	SERVER_PORT=$$PORT ./$(SERVER_BIN) $$PORT & \
+	sleep 2; \
+	echo "Iniciando cliente en el puerto $$PORT..."; \
+	SERVER_PORT=$$PORT LD_LIBRARY_PATH=. ./$(CLIENT_BIN); \
+	wait
 
 # Limpiar archivos generados
 clean:

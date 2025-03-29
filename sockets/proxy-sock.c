@@ -1,14 +1,48 @@
+#ifndef MAX_VALUE1_LEN
+#define MAX_VALUE1_LEN 256
+#endif
+#ifndef MAX_V2
+#define MAX_V2 32
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#include <sys/stat.h>
-#include <mqueue.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "claves.h"
+#include <math.h>
+#include <pthread.h>
 
-#define SERVER_QUEUE "/mq_server"
-#define CLIENT_QUEUE "/client_queue_%d"
+#define DEFAULT_SERVER_IP "127.0.0.1"
+#define DEFAULT_SERVER_PORT 8080
+
+#define MSG_BUFFER_SIZE 2048
+
+// Variables globales para la configuración del servidor
+static char g_server_ip[MAX_VALUE1_LEN] = DEFAULT_SERVER_IP;
+static int g_server_port = DEFAULT_SERVER_PORT;
+
+// Mutex global para sincronización
+static pthread_mutex_t proxy_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// Función de inicialización a llamar desde la aplicación cliente
+void init_proxy(const char *ip, int port) {
+    const char *env_port = getenv("SERVER_PORT");
+    if (env_port) {
+        g_server_port = atoi(env_port);
+    } else if (port > 0) {
+        g_server_port = port;
+    }
+    if (ip) {
+        strncpy(g_server_ip, ip, MAX_VALUE1_LEN-1);
+        g_server_ip[MAX_VALUE1_LEN-1] = '\0';
+    }
+}
 
 // Definiciones compartidas
 typedef enum {
@@ -19,9 +53,6 @@ typedef enum {
     OP_DELETE,
     OP_EXIST
 } op_code_t;
-
-#define MAX_VALUE1_LEN 256
-#define MAX_V2 32
 
 // Estructura de mensaje de petición.
 typedef struct {
@@ -43,53 +74,128 @@ typedef struct {
     struct Coord value3;
 } response_msg_t;
 
+///////////////// FUNCIONES DE CONVERSIÓN //////////////////
+// Se copia el código utilizado en servidor-sock.c
+
+void request_to_string(request_msg_t *req, char *buffer, size_t size) {
+    char doubles[2048] = "";
+    for (int i = 0; i < req->N_value2; i++) {
+        char temp[64];
+        // Convertir el double a cadena con 17 decimales
+        sprintf(temp, "%.17lf%s", req->V_value2[i], (i < req->N_value2 - 1) ? "," : "");
+        strcat(doubles, temp);
+    }
+    sprintf(buffer, "%d|%d|%s|%d|%s|%d,%d|%s", 
+        req->op, req->key, req->value1, req->N_value2, doubles, req->value3.x, req->value3.y, req->client_queue_name);
+}
+
+void response_to_string(response_msg_t *resp, char *buffer, size_t size) {
+    char doubles[2048] = "";
+    for (int i = 0; i < resp->N_value2; i++) {
+        char temp[64];
+        // Usar 17 decimales para la conversión directa
+        sprintf(temp, "%.17lf%s", resp->V_value2[i], (i < resp->N_value2 - 1) ? "," : "");
+        strcat(doubles, temp);
+    }
+    sprintf(buffer, "%d|%s|%d|%s|%d,%d", 
+        resp->result, resp->value1, resp->N_value2, doubles, resp->value3.x, resp->value3.y);
+}
+
+void string_to_response(char *buffer, response_msg_t *resp) {
+    char *token = strtok(buffer, "|");
+    if (!token) return;
+    resp->result = atoi(token);
+
+    token = strtok(NULL, "|");
+    if (!token) return;
+    strncpy(resp->value1, token, MAX_VALUE1_LEN-1);
+    resp->value1[MAX_VALUE1_LEN-1] = '\0';
+
+    token = strtok(NULL, "|");
+    if (!token) return;
+    int expected = atoi(token);
+    resp->N_value2 = expected;
+
+    token = strtok(NULL, "|");
+    if (!token) return;
+    {
+        int count = 0;
+        char *num = strtok(token, ",");
+        while (num && count < expected && count < MAX_V2) {
+            resp->V_value2[count++] = atof(num);
+            num = strtok(NULL, ",");
+        }
+    }
+
+    token = strtok(NULL, "|");
+    if (token) {
+        char *xStr = strtok(token, ",");
+        char *yStr = strtok(NULL, ",");
+        if (xStr && yStr) {
+            resp->value3.x = atoi(xStr);
+            resp->value3.y = atoi(yStr);
+        }
+    }
+}
+///////////////////////////////////////////////////////////
+
 // Función interna para enviar una petición y esperar la respuesta.
 static int send_request(request_msg_t *request, response_msg_t *response) {
-    mqd_t server_q, client_q;
-    char client_queue_name[64];
-    
-    // Generar un nombre único para la cola del cliente basado en el PID.
-    sprintf(client_queue_name, CLIENT_QUEUE, getpid());
-    strncpy(request->client_queue_name, client_queue_name, sizeof(request->client_queue_name)-1);
-    request->client_queue_name[sizeof(request->client_queue_name)-1] = '\0';
-
-    // Crear la cola del cliente con tamaño máximo igual al de la respuesta.
-    struct mq_attr attr;
-    attr.mq_flags = 0;
-    attr.mq_maxmsg = 10;
-    attr.mq_msgsize = sizeof(response_msg_t);
-    attr.mq_curmsgs = 0;
-    
-    client_q = mq_open(client_queue_name, O_CREAT | O_RDONLY, 0666, &attr);
-    if (client_q == (mqd_t)-1) {
-        perror("mq_open (cliente)");
+    pthread_mutex_lock(&proxy_mutex);
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if(sockfd == -1) {
+        perror("socket");
+        pthread_mutex_unlock(&proxy_mutex);
         return -2;
     }
     
-    server_q = mq_open(SERVER_QUEUE, O_WRONLY);
-    if (server_q == (mqd_t)-1) {
-        perror("mq_open (servidor)");
-        mq_close(client_q);
-        mq_unlink(client_queue_name);
+    struct sockaddr_in serv_addr;
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    // Usar variables globales establecidas (inicializadas vía init_proxy)
+    if(inet_pton(AF_INET, g_server_ip, &serv_addr.sin_addr) <= 0) {
+        perror("inet_pton");
+        close(sockfd);
+        pthread_mutex_unlock(&proxy_mutex);
+        return -2;
+    }
+    // Usar g_server_port sin sobrescribirlo
+    serv_addr.sin_port = htons(g_server_port);
+    
+    // Agregar mensaje de depuración
+    printf("Proxy: conectando a %s:%d\n", g_server_ip, g_server_port);
+    
+    if(connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
+        perror("connect");
+        close(sockfd);
+        pthread_mutex_unlock(&proxy_mutex);
         return -2;
     }
     
-    if (mq_send(server_q, (char *)request, sizeof(request_msg_t), 0) == -1) {
-        perror("mq_send (servidor)");
-        mq_close(client_q);
-        mq_unlink(client_queue_name);
+    char buffer[MSG_BUFFER_SIZE] = "";
+    // Convertir la request a cadena y enviar
+    request_to_string(request, buffer, sizeof(buffer));
+    if(send(sockfd, buffer, strlen(buffer), 0) != (ssize_t)strlen(buffer)) {
+        perror("send");
+        close(sockfd);
+        pthread_mutex_unlock(&proxy_mutex);
         return -2;
     }
     
-    if (mq_receive(client_q, (char *)response, sizeof(response_msg_t), NULL) == -1) {
-        perror("mq_receive (cliente)");
-        mq_close(client_q);
-        mq_unlink(client_queue_name);
+    // Recibir la respuesta como cadena
+    memset(buffer, 0, sizeof(buffer));
+    ssize_t n = recv(sockfd, buffer, sizeof(buffer)-1, 0);
+    if(n <= 0) {
+        perror("recv");
+        close(sockfd);
+        pthread_mutex_unlock(&proxy_mutex);
         return -2;
     }
+    buffer[n] = '\0';
+    string_to_response(buffer, response);
     
-    mq_close(client_q);
-    mq_unlink(client_queue_name);
+    close(sockfd);
+    pthread_mutex_unlock(&proxy_mutex);
     return response->result;
 }
 
@@ -107,6 +213,9 @@ int set_value(int key, char *value1, int N_value2, double *V_value2, struct Coor
     // Si la cadena es mayor a 255 caracteres, se rechaza.
     if (strlen(value1) > 255)
         return -1;
+    if (N_value2 < 1 || N_value2 > MAX_V2) {
+        return -1;
+    }
     request_msg_t req;
     response_msg_t resp;
     memset(&req, 0, sizeof(req));
@@ -142,6 +251,9 @@ int modify_value(int key, char *value1, int N_value2, double *V_value2, struct C
     // Verificar longitud de la cadena.
     if (strlen(value1) > 255)
         return -1;
+    if (N_value2 < 1 || N_value2 > MAX_V2) {
+        return -1;
+    }
     request_msg_t req;
     response_msg_t resp;
     memset(&req, 0, sizeof(req));

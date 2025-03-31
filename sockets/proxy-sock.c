@@ -17,6 +17,7 @@
 #include "claves.h"
 #include <math.h>
 #include <pthread.h>
+#include <netdb.h>
 
 #define DEFAULT_SERVER_IP "127.0.0.1"
 #define DEFAULT_SERVER_PORT 8080
@@ -158,21 +159,23 @@ static int send_request(request_msg_t *request, response_msg_t *response) {
     struct sockaddr_in serv_addr;
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    // Usar variables globales establecidas (inicializadas vía init_proxy)
-    if(inet_pton(AF_INET, g_server_ip, &serv_addr.sin_addr) <= 0) {
-        perror("inet_pton");
+
+    // Resolver el nombre del host usando gethostbyname
+    struct hostent *host = gethostbyname(g_server_ip);
+    if (!host) {
+        perror("gethostbyname");
+        printf("Error: No se pudo resolver el host '%s'\n", g_server_ip);
         close(sockfd);
         pthread_mutex_unlock(&proxy_mutex);
         return -2;
     }
-    // Usar g_server_port sin sobrescribirlo
+    memcpy(&serv_addr.sin_addr, host->h_addr_list[0], host->h_length);
     serv_addr.sin_port = htons(g_server_port);
-    
-    // Agregar mensaje de depuración
+
     printf("Proxy: conectando a %s:%d\n", g_server_ip, g_server_port);
-    
     if(connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
         perror("connect");
+        printf("Error: No se pudo conectar al servidor en %s:%d\n", g_server_ip, g_server_port);
         close(sockfd);
         pthread_mutex_unlock(&proxy_mutex);
         return -2;

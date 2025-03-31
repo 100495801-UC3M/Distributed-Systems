@@ -20,8 +20,17 @@ void print_tuple(int key, const char *value1, int N_value2, double *V_value2, st
 }
 
 int main(void) {
-    // Llamada para que el proxy lea la variable SERVER_PORT
-    init_proxy(NULL, 0);
+    // Leer las variables de entorno IP_TUPLAS y PORT_TUPLAS
+    char *ip = getenv("IP_TUPLAS");
+    char *port_str = getenv("PORT_TUPLAS");
+    if (!ip || !port_str) {
+        fprintf(stderr, "Error: Las variables de entorno IP_TUPLAS y PORT_TUPLAS deben estar definidas.\n");
+        return 1;
+    }
+    int port = atoi(port_str);
+
+    // Configurar el proxy con las variables de entorno
+    init_proxy(ip, port);
 
     int err;
     char value1[MAX_STR_LEN];

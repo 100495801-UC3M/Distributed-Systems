@@ -10,11 +10,11 @@ PROXY_OBJ = proxy-sock.o
 LIBRARY = libclaves.so
 
 CLIENT_SRC = app-cliente.c
-CLIENT_BIN = app-cliente
+CLIENT_BIN = cliente
 
 SERVER_SRC = servidor-sock.c
 SERVER_EXTRA = claves.c
-SERVER_BIN = servidor-sock
+SERVER_BIN = servidor
 
 # Compilar la biblioteca compartida libclaves.so (usada por el cliente)
 $(LIBRARY): $(PROXY_OBJ)
@@ -32,18 +32,17 @@ $(CLIENT_BIN): $(CLIENT_SRC) $(LIBRARY)
 $(SERVER_BIN): $(SERVER_SRC) $(SERVER_EXTRA)
 	$(CC) -o $@ $(SERVER_SRC) $(SERVER_EXTRA) $(LIBS)
 
-# Ejecutar el servidor y el cliente con el mismo puerto el comando es: make run-server PORT=<puerto>
-run-server: $(SERVER_BIN) $(CLIENT_BIN)
-	@ if [ -z "$(PORT)" ]; then \
-		echo "Uso: make run-server PORT=<puerto>"; \
+# Compilar el servidor, incluyendo claves.c (que tiene la implementación real en el lado del servidor)
+servidor: $(SERVER_BIN)
+
+# Ejecutar el cliente
+run-client: $(CLIENT_BIN)
+	@ if [ -z "$(IP_TUPLAS)" ] || [ -z "$(PORT_TUPLAS)" ]; then \
+		echo "Uso: env IP_TUPLAS=<ip> PORT_TUPLAS=<puerto> make run-client"; \
 		exit 1; \
 	  fi; \
-	echo "Iniciando servidor en el puerto $$PORT..."; \
-	SERVER_PORT=$$PORT ./$(SERVER_BIN) $$PORT & \
-	sleep 2; \
-	echo "Iniciando cliente en el puerto $$PORT..."; \
-	SERVER_PORT=$$PORT LD_LIBRARY_PATH=. ./$(CLIENT_BIN); \
-	wait
+	echo "Iniciando cliente con IP=$$IP_TUPLAS y PORT=$$PORT_TUPLAS..."; \
+	LD_LIBRARY_PATH=. ./$(CLIENT_BIN)
 
 # Limpiar archivos generados
 clean:

@@ -1,18 +1,19 @@
 # Distribuidos
-100495833 - Javier Diez
-100495801 - Mario Hidalgo
+100495833 - Javier Diez  
+100495801 - Mario Hidalgo  
 
+## Uso:
 
-Uso:
-
-Para compilar todo:
+### Para compilar todo:
 make
 
-Para ejecutar el servidor (en una terminal):
-make run-server PORT=8080
+### Para ejecutar el servidor (en una terminal):
+make servidor
+./servidor <puerto>
 
-Para ejecutar el cliente (en otra terminal):
-make run-client
+### Para ejecutar el cliente (en otra terminal):
+make cliente
+env IP_TUPLAS=<ip> PORT_TUPLAS=<puerto> ./cliente
 
-Para limpiar los archivos:
+### Para limpiar los archivos:
 make clear

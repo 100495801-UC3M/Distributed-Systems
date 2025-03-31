@@ -90,7 +90,7 @@ void string_to_request(char *buffer, request_msg_t *req) {
             num = strtok(NULL, ",");
             if (!num) break;
             uint32_t low = atoi(num);
-            req->V_value2[count++] = ((double)high << 16) | low;
+            req->V_value2[count++] = ((uint8_t)high << 16) | low;
             num = strtok(NULL, ",");
         }
     }

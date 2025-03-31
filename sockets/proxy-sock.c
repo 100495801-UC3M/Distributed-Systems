@@ -128,7 +128,7 @@ void string_to_response(char *buffer, response_msg_t *resp) {
             num = strtok(NULL, ",");
             if (!num) break;
             uint32_t low = atoi(num);
-            resp->V_value2[count++] = ((double)high << 16) | low;
+            resp->V_value2[count++] = ((uint8_t)high << 16) | low;
             num = strtok(NULL, ",");
         }
     }

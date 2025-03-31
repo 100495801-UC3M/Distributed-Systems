@@ -9,7 +9,7 @@ Para compilar todo:
 make
 
 Para ejecutar el servidor (en una terminal):
-make run-server
+make run-server PORT=8080
 
 Para ejecutar el cliente (en otra terminal):
 make run-client

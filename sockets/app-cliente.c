@@ -3,6 +3,9 @@
 #include <string.h>
 #include "claves.h"
 
+// Declaración de la función init_proxy
+void init_proxy(const char *ip, int port);
+
 #define MAX_STR_LEN 256
 #define MAX_VECTOR 32
 

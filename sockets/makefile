@@ -24,9 +24,9 @@ $(LIBRARY): $(PROXY_OBJ)
 $(PROXY_OBJ): $(PROXY_SRC)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Compilar el cliente app-cliente, enlazado con libclaves.so
+# Compilar el cliente app-cliente, enlazado con libclaves.so y configurando el rpath
 $(CLIENT_BIN): $(CLIENT_SRC) $(LIBRARY)
-	$(CC) -o $@ $< -L. -lclaves $(LIBS)
+	$(CC) -o $@ $< -L. -lclaves $(LIBS) -Wl,-rpath,.
 
 # Compilar el servidor, incluyendo claves.c (que tiene la implementación real en el lado del servidor)
 $(SERVER_BIN): $(SERVER_SRC) $(SERVER_EXTRA)

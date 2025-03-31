@@ -212,7 +212,20 @@ int main(int argc, char *argv[]) {
     
     if(bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
         perror("bind");
-        exit(EXIT_FAILURE);
+        printf("Error: No se pudo enlazar al puerto %d. Intentando con un puerto dinámico...\n", port);
+        server_addr.sin_port = 0; // Permitir que el sistema asigne un puerto dinámico
+        if(bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+            perror("bind (puerto dinámico)");
+            exit(EXIT_FAILURE);
+        }
+        // Obtener el puerto asignado dinámicamente
+        socklen_t addr_len = sizeof(server_addr);
+        if(getsockname(server_fd, (struct sockaddr *)&server_addr, &addr_len) == -1) {
+            perror("getsockname");
+            exit(EXIT_FAILURE);
+    }
+    port = ntohs(server_addr.sin_port);
+        printf("Puerto asignado dinámicamente: %d\n", port);
     }
     if(listen(server_fd, BACKLOG) == -1) {
         perror("listen");

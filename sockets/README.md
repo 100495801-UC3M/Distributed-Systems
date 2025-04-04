@@ -18,8 +18,9 @@ make cliente
 export IP_TUPLAS=<ip> PORT_TUPLAS=<puerto>
 env IP_TUPLAS=<ip>PORT_TUPLAS=<puerto> ./cliente
 ## Ejemplo:
-export IP_TUPLAS=127.0.0.1 PORT_TUPLAS=8080
-env IP_TUPLAS=127.0.0.1 PORT_TUPLAS=8080 ./cliente
+export IP_TUPLAS=localhost PORT_TUPLAS=8080
+env IP_TUPLAS=localhost PORT_TUPLAS=8080 ./cliente
+### Importante: el puerto de PORT_TUPLAS debe coincidir con el del servidor
 
 ### Para limpiar los archivos:
 make clear

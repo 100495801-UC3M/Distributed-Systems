@@ -58,7 +58,7 @@ int main(void) {
     // Insertar varias claves válidas
     int keys[] = {1, 2, 3, 4, 5};
     for (int i = 0; i < 5; i++) {
-        err = set_value(keys[i], v1, 3, v2, v3);
+        err = set_value(keys[i], v1, 3.0, v2, v3);
         printf("set_value() para clave %d retornó: %d (esperado 0)\n", keys[i], err);
     }
     printf("\n");
@@ -87,7 +87,7 @@ int main(void) {
     char *new_v1 = "Valor modificado";
     double new_v2[] = {9.9, 8.8};
     struct Coord new_v3 = {30, 40};
-    err = modify_value(4, new_v1, 2, new_v2, new_v3);
+    err = modify_value(4, new_v1, 2.0, new_v2, new_v3);
     printf("modify_value() para clave 4 retornó: %d (esperado 0)\n", err);
     // Verificar modificación
     err = get_value(4, value1, &N_value2, V_value2, &value3);
@@ -156,7 +156,7 @@ int main(void) {
     printf("===== TEST 10: Validación de N_value2 =====\n");
     // N_value2 mínimo válido = 1
     double single_val[1] = {42.0};
-    err = set_value(60, "Un solo elemento", 1, single_val, v3);
+    err = set_value(60.0, "Un solo elemento", 1, single_val, v3);
     printf("set_value() para clave 60 con N_value2=1 retornó: %d (esperado 0)\n", err);
     // N_value2 máximo válido = 32
     double vec32[32];

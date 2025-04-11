@@ -184,6 +184,7 @@ static int send_request(request_msg_t *request, response_msg_t *response) {
     char buffer[MSG_BUFFER_SIZE] = "";
     // Convertir la request a cadena y enviar
     request_to_string(request, buffer, sizeof(buffer));
+    // TODO: Cambiar strlen(b) por Cambiar strlen(b)+1
     if(send(sockfd, buffer, strlen(buffer), 0) != (ssize_t)strlen(buffer)) {
         perror("send");
         close(sockfd);
@@ -193,6 +194,7 @@ static int send_request(request_msg_t *request, response_msg_t *response) {
     
     // Recibir la respuesta como cadena
     memset(buffer, 0, sizeof(buffer));
+    // TODO: Cambiar recv por la función ReadLine(sockfd, buffer, sizeof(buffer))
     ssize_t n = recv(sockfd, buffer, sizeof(buffer)-1, 0);
     if(n <= 0) {
         perror("recv");

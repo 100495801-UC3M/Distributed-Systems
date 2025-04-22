@@ -184,8 +184,7 @@ static int send_request(request_msg_t *request, response_msg_t *response) {
     char buffer[MSG_BUFFER_SIZE] = "";
     // Convertir la request a cadena y enviar
     request_to_string(request, buffer, sizeof(buffer));
-    // TODO: Cambiar strlen(b) por Cambiar strlen(b)+1
-    if(send(sockfd, buffer, strlen(buffer), 0) != (ssize_t)strlen(buffer)) {
+    if(send(sockfd, buffer, strlen(buffer)+1, 0) != (ssize_t)strlen(buffer)) {
         perror("send");
         close(sockfd);
         pthread_mutex_unlock(&proxy_mutex);

@@ -4,7 +4,7 @@
 #include "claves.h"
 
 // Declaración de la función init_proxy
-void init_proxy(const char *ip, int port);
+void init_proxy(const char *host);
 
 #define MAX_STR_LEN 256
 #define MAX_VECTOR 32
@@ -23,17 +23,15 @@ void print_tuple(int key, const char *value1, int N_value2, double *V_value2, st
 }
 
 int main(void) {
-    // Leer las variables de entorno IP_TUPLAS y PORT_TUPLAS
-    char *ip = getenv("IP_TUPLAS");
-    char *port_str = getenv("PORT_TUPLAS");
-    if (!ip || !port_str) {
-        fprintf(stderr, "Error: Las variables de entorno IP_TUPLAS y PORT_TUPLAS deben estar definidas.\n");
+    // Leer la variable de entorno IP_TUPLAS (puede ser un nombre o IP)
+    char *host = getenv("IP_TUPLAS");
+    if (!host) {
+        fprintf(stderr, "Error: La variable de entorno IP_TUPLAS debe estar definida.\n");
         return 1;
     }
-    int port = atoi(port_str);
 
-    // Configurar el proxy con las variables de entorno
-    init_proxy(ip, port);
+    // Configurar el proxy con el hostname/IP
+    init_proxy(host);
 
     int err;
     char value1[MAX_STR_LEN];

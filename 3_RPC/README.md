@@ -9,18 +9,19 @@ make
 
 ### Para ejecutar el servidor (en una terminal):
 make servidor
-./servidor <puerto>
-## Ejemplo:
-./servidor 8080
+./servidor 
 
 ### Para ejecutar el cliente (en otra terminal):
-make cliente
-export IP_TUPLAS=<ip> PORT_TUPLAS=<puerto>
-env IP_TUPLAS=<ip>PORT_TUPLAS=<puerto> ./cliente
+make appcliente
+export IP_TUPLAS=<ip> 
+env IP_TUPLAS=<ip> ./appcliente
 ## Ejemplo:
-export IP_TUPLAS=localhost PORT_TUPLAS=8080
-env IP_TUPLAS=localhost PORT_TUPLAS=8080 ./cliente
-### Importante: el puerto de PORT_TUPLAS debe coincidir con el del servidor
+export IP_TUPLAS=localhost
+./appcliente
+## NOTA
+Si los tests no se ejecutan directamente (no se encuentra "libclaves.so"), ejecutar
+export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
+./appcliente
 
 ### Para limpiar los archivos:
-make clear
+make clean

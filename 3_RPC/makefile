@@ -5,7 +5,7 @@ RPCGEN = rpcgen
 CFLAGS += -g -I/usr/include/tirpc
 
 # Bibliotecas compartidas RPC necesarias
-LDLIBS_RPC = -ltirpc -lnsl -lresolv -lpthread -ldl
+LDLIBS_RPC = -ltirpc -lresolv -lpthread -ldl
 
 # Archivo de la interfaz RPC
 RPC_X = tuplas.x
@@ -66,7 +66,7 @@ targets += $(CLIENT_EXE)
 # Aseguramos que la librería exista antes de enlazar
 $(CLIENT_EXE): $(LIB) $(OBJS_CLIENT)
 	$(CC) $(CFLAGS) -o $(CLIENT_EXE) $(OBJS_CLIENT) -L. -lclaves $(LDLIBS_RPC)
-	export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
+	export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH 
 
 # Enlazar el ejecutable del servidor (incluye servidor-rpc.o)
 targets += $(SERVER_EXE)

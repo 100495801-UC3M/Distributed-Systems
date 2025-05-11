@@ -460,7 +460,7 @@ void *handle_client(void *arg) {
                 
                         rpc_log_input_generic.username, 
                         rpc_log_input_generic.operation_details, 
-                        rpc_log_input_generic.timestamp_str);
+                        rpc_log_input_generic.timestamp_str;
                 fflush(stdout);
 
                 struct timeval timeout_rpc_call = {2, 0}; 

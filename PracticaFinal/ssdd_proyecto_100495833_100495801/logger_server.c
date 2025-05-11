@@ -56,3 +56,4 @@ void * log_operation_1_svc(log_data *argp, struct svc_req *rqstp)
     fflush(stdout); 
 
     return (void *) &result_placeholder; 
+}

@@ -4,9 +4,9 @@
 #include <string.h> 
 #include <stdlib.h> 
 
-void * log_operation_1_svc(log_data *argp, struct svc_req *rqstp) // FIRMA CORREGIDA
+void * log_operation_1_svc(log_data *argp, struct svc_req *rqstp)
 {
-    static char result_placeholder; // Para devolver algo si la firma es void*
+    static char result_placeholder;
 
     char date_part[20];
     char time_part[20];  
@@ -15,7 +15,7 @@ void * log_operation_1_svc(log_data *argp, struct svc_req *rqstp) // FIRMA CORRE
     char operation_details_copy[MAX_STR_LEN + 1];
     char timestamp_str_copy[MAX_STR_LEN + 1];
 
-    // Prevenir unused parameter warning si no usas rqstp directamente
+    // Prevenir unused parameter warning
     (void)rqstp;
 
     if (argp->username) {
@@ -55,5 +55,4 @@ void * log_operation_1_svc(log_data *argp, struct svc_req *rqstp) // FIRMA CORRE
     printf("----------------------------------------\n"); 
     fflush(stdout); 
 
-    return (void *) &result_placeholder; // VALOR DE RETORNO CORREGIDO
-}
+    return (void *) &result_placeholder; 

@@ -281,11 +281,11 @@ void *handle_client(void *arg) {
             }
 
             if (requester_idx == -1) { // Solicitante no encontrado
-                response_code_p2p = 1; // Código PDF: el usuario que realiza la operación no existe
+                response_code_p2p = 1;
             } else if (!users[requester_idx].connected) { // Solicitante no conectado
                 response_code_p2p = 2;
             } else { // Solicitante OK y conectado
-                response_code_p2p = 0; // Marcamos como OK para la lógica RPC, pero la respuesta al cliente P2P es diferente
+                response_code_p2p = 0;
                 unsigned char ok_code_p2p = 0;
                 if(send(fd, &ok_code_p2p, 1, 0) <=0) { session_active = 0; pthread_mutex_unlock(&server_mutex); continue; }
 
@@ -348,12 +348,12 @@ void *handle_client(void *arg) {
             } else if (target_idx < 0) { 
                 response_code_p2p = 3; 
             } else {
-                response_code_p2p = 0; // OK para lógica RPC, la respuesta P2P es diferente
+                response_code_p2p = 0;
                 unsigned char ok_code_p2p = 0;
                 if(send(fd, &ok_code_p2p, 1, 0) <=0) { session_active = 0; pthread_mutex_unlock(&server_mutex); continue; }
                 
                 int files_to_list_count = users[target_idx].file_count;
-                char count_str_lc[12]; // Nombre diferente
+                char count_str_lc[12];
                 snprintf(count_str_lc, sizeof count_str_lc, "%d", files_to_list_count);
                 if(send(fd, count_str_lc, strlen(count_str_lc) + 1, 0) <=0) { session_active = 0; pthread_mutex_unlock(&server_mutex); continue; }
 
@@ -365,7 +365,7 @@ void *handle_client(void *arg) {
             if (!session_active) continue;
 
             if (rpc_logger_client != NULL && received_timestamp_str != NULL ) {
-                log_data rpc_log_input_lc; // Renombrada
+                log_data rpc_log_input_lc;
                 char op_detail_lc[MAX_STR_LEN];
                 snprintf(op_detail_lc, MAX_STR_LEN, "%s %s", args[0], target_user_name_content); 
                 op_detail_lc[MAX_STR_LEN-1] = '\0';

@@ -1,6 +1,6 @@
 from flask import Flask, Response
 import datetime
-import time # Aunque no se usa directamente, es bueno tenerlo por si acaso
+import time
 
 app = Flask(__name__)
 
@@ -17,14 +17,13 @@ def get_time():
     timestamp_str = now.strftime("%d/%m/%Y %H:%M:%S")
     
     # Devolver la cadena como texto plano
-    # Flask se encarga de las cabeceras HTTP correctas para text/plain
     return Response(timestamp_str, mimetype='text/plain')
 
 def run_time_api():
     try:
         print(f"Servicio de hora REST (Flask) iniciado en http://{HOST}:{PORT}/getTime")
         print("Presiona Ctrl+C para detener el servidor.")
-        app.run(host=HOST, port=PORT) # debug=True es útil para desarrollo, pero quítalo para "producción"
+        app.run(host=HOST, port=PORT)
     except Exception as e:
         print(f"Error al iniciar el servidor de hora con Flask: {e}")
 

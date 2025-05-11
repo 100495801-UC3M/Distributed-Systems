@@ -52,9 +52,9 @@ class client:
     # ---------------- Timestamp Service ----------------
     @staticmethod
     def _get_current_timestamp() -> str:
-        url_to_fetch = "http://localhost:5000/getTime" # Asegúrate que el puerto es correcto
+        url_to_fetch = "http://localhost:5000/getTime" 
         try:
-            with urllib.request.urlopen(url_to_fetch, timeout=2) as response: # Aumenta un poco el timeout por si acaso
+            with urllib.request.urlopen(url_to_fetch, timeout=2) as response:
                 if response.status == 200:
                     timestamp_data = response.read().decode('utf-8')
                     return timestamp_data
@@ -272,14 +272,6 @@ class client:
         timestamp = client._get_current_timestamp() # Obtener timestamp para DISCONNECT
         if "ERROR" in timestamp or "UNAVAILABLE" in timestamp:
             print(f"DISCONNECT FAIL (timestamp service error: {timestamp})")
-            # Continuar con la desconexión local como indica el PDF
-        # else: # Solo enviar al servidor si el timestamp se obtuvo
-            # No, el PDF dice que el cliente se desconecta localmente de todas formas.
-            # La pregunta es si se *intenta* enviar el comando al servidor aun con error de TS.
-            # Por ahora, lo intentaremos, el servidor podría rechazarlo si el TS es inválido.
-            # O podríamos decidir no enviarlo y solo hacer limpieza local.
-            # Para ser consistentes, enviamos el comando (con el TS de error si es el caso).
-
         try:
             # Protocolo: DISCONNECT\0<timestamp>\0<user_name>\0
             message = f"DISCONNECT\0{timestamp}\0{username_to_send}\0".encode('utf-8')
@@ -502,9 +494,6 @@ class client:
             print(f"LIST_CONTENT FAIL (unknown error: {e})"); return client.RC.ERROR
 
     # ---------------- GET_FILE ----------------
-    # GET_FILE es una comunicación P2P, no pasa por el servidor central de Parte 1,
-    # por lo tanto, no necesita enviar el timestamp del servicio web a otro peer.
-    # El protocolo para GET_FILE entre peers se mantiene como en la Parte 1.
     @staticmethod
     def get_file(remote_user: str, remote_file: str, local_file: str) -> "client.RC":
         if client._username is None: 
@@ -521,8 +510,8 @@ class client:
         peer_socket = None
         file_handle = None
         operation_failed = False
-        bytes_received = 0 # Definir fuera para el finally
-        file_size = -1     # Definir fuera para el finally
+        bytes_received = 0
+        file_size = -1
 
         try:
             peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -545,7 +534,6 @@ class client:
                 file_size = int(size_str_bytes[:-1].decode())
 
                 file_handle = open(local_file, 'wb')
-                # bytes_received = 0 # Ya está definido arriba
                 while bytes_received < file_size:
                     chunk = peer_socket.recv(min(1024, file_size - bytes_received))
                     if not chunk:
